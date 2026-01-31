@@ -1,0 +1,387 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Plus, Search, Edit, Trash2, Eye } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Modal } from '@/components/ui/Modal';
+import { Pagination } from '@/components/ui/Pagination';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { LoadingSpinner, EmptyState } from '@/components/ui/States';
+import { Input, Select, Textarea } from '@/components/ui/FormFields';
+
+interface Contact {
+  id: string;
+  code: string;
+  name: string;
+  type: 'CUSTOMER' | 'VENDOR' | 'BOTH';
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  gstin: string | null;
+  isActive: boolean;
+}
+
+const contactTypes = [
+  { value: 'CUSTOMER', label: 'Customer' },
+  { value: 'VENDOR', label: 'Vendor' },
+  { value: 'BOTH', label: 'Both' },
+];
+
+export default function ContactsPage() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'CUSTOMER',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    gstin: '',
+    pan: '',
+    creditLimit: '',
+    paymentTerms: '30',
+  });
+
+  const fetchContacts = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '10',
+        ...(search && { search }),
+        ...(typeFilter && { type: typeFilter }),
+      });
+      const res = await fetch(`/api/contacts?${params}`);
+      const data = await res.json();
+      setContacts(data.contacts);
+      setTotalPages(data.pagination.totalPages);
+    } catch (error) {
+      toast.error('Failed to fetch contacts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchContacts();
+  }, [page, search, typeFilter]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const url = editingContact 
+        ? `/api/contacts/${editingContact.id}` 
+        : '/api/contacts';
+      const method = editingContact ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          creditLimit: formData.creditLimit ? parseFloat(formData.creditLimit) : null,
+          paymentTerms: parseInt(formData.paymentTerms),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+
+      toast.success(editingContact ? 'Contact updated' : 'Contact created');
+      setIsModalOpen(false);
+      resetForm();
+      fetchContacts();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this contact?')) return;
+    
+    try {
+      const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      toast.success('Contact deleted');
+      fetchContacts();
+    } catch (error) {
+      toast.error('Failed to delete contact');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      type: 'CUSTOMER',
+      email: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
+      pincode: '',
+      gstin: '',
+      pan: '',
+      creditLimit: '',
+      paymentTerms: '30',
+    });
+    setEditingContact(null);
+  };
+
+  const openEditModal = (contact: Contact) => {
+    setEditingContact(contact);
+    setFormData({
+      name: contact.name,
+      type: contact.type,
+      email: contact.email || '',
+      phone: contact.phone || '',
+      address: '',
+      city: contact.city || '',
+      state: '',
+      pincode: '',
+      gstin: contact.gstin || '',
+      pan: '',
+      creditLimit: '',
+      paymentTerms: '30',
+    });
+    setIsModalOpen(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Contacts</h1>
+          <p className="text-gray-500 dark:text-gray-400">Manage customers and vendors</p>
+        </div>
+        <button
+          onClick={() => {
+            resetForm();
+            setIsModalOpen(true);
+          }}
+          className="btn-primary flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Add Contact
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="card p-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search contacts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input-field pl-10"
+            />
+          </div>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="input-field w-full md:w-48"
+          >
+            <option value="">All Types</option>
+            {contactTypes.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="card">
+        {loading ? (
+          <LoadingSpinner />
+        ) : contacts.length === 0 ? (
+          <EmptyState
+            title="No contacts found"
+            description="Get started by creating your first contact."
+            action={
+              <button onClick={() => setIsModalOpen(true)} className="btn-primary">
+                Add Contact
+              </button>
+            }
+          />
+        ) : (
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>City</th>
+                  <th>GSTIN</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contacts.map((contact) => (
+                  <tr key={contact.id}>
+                    <td className="font-medium">{contact.code}</td>
+                    <td>{contact.name}</td>
+                    <td><StatusBadge status={contact.type} /></td>
+                    <td>{contact.email || '-'}</td>
+                    <td>{contact.phone || '-'}</td>
+                    <td>{contact.city || '-'}</td>
+                    <td className="text-xs">{contact.gstin || '-'}</td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openEditModal(contact)}
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(contact.id)}
+                          className="p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+      </div>
+
+      {/* Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          resetForm();
+        }}
+        title={editingContact ? 'Edit Contact' : 'Add Contact'}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Name *"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+            <Select
+              label="Type *"
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              options={contactTypes}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            />
+            <Input
+              label="Phone"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            />
+          </div>
+
+          <Textarea
+            label="Address"
+            value={formData.address}
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          />
+
+          <div className="grid grid-cols-3 gap-4">
+            <Input
+              label="City"
+              value={formData.city}
+              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            />
+            <Input
+              label="State"
+              value={formData.state}
+              onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+            />
+            <Input
+              label="Pincode"
+              value={formData.pincode}
+              onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="GSTIN"
+              value={formData.gstin}
+              onChange={(e) => setFormData({ ...formData, gstin: e.target.value })}
+              placeholder="22AAAAA0000A1Z5"
+            />
+            <Input
+              label="PAN"
+              value={formData.pan}
+              onChange={(e) => setFormData({ ...formData, pan: e.target.value })}
+              placeholder="AAAAA0000A"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Credit Limit"
+              type="number"
+              value={formData.creditLimit}
+              onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
+            />
+            <Input
+              label="Payment Terms (Days)"
+              type="number"
+              value={formData.paymentTerms}
+              onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => {
+                setIsModalOpen(false);
+                resetForm();
+              }}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary">
+              {editingContact ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
