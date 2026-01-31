@@ -17,6 +17,7 @@ datasource db {
 enum UserRole {
   ADMIN
   CUSTOMER
+  VENDOR
 }
 
 model User {
@@ -76,11 +77,25 @@ model Contact {
   @@map("contacts")
 }
 
+// Keep enum for backward compatibility, but add Category model for custom categories
 enum ProductCategory {
   RAW_MATERIAL
   FINISHED_GOODS
   CONSUMABLES
   SERVICES
+  CUSTOM
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@map("categories")
 }
 
 model Product {
@@ -88,7 +103,9 @@ model Product {
   code                String          @unique
   name                String
   description         String?
-  category            ProductCategory
+  category            ProductCategory @default(CUSTOM)
+  categoryId          String?
+  categoryRef         Category?       @relation(fields: [categoryId], references: [id])
   unit                String          @default("PCS")
   purchasePrice       Decimal         @db.Decimal(15, 2)
   salePrice           Decimal         @db.Decimal(15, 2)

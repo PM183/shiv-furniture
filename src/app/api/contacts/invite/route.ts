@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 import { sendEmail, generateInviteEmail, generateToken } from '@/lib/email';
+import { UserRole } from '@prisma/client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,13 +28,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
 
-    if (contact.type === 'VENDOR') {
-      return NextResponse.json(
-        { error: 'Cannot send portal invite to vendors' },
-        { status: 400 }
-      );
-    }
-
     if (!contact.email) {
       return NextResponse.json(
         { error: 'Contact does not have an email address' },
@@ -41,11 +35,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine role based on contact type
+    const role = (contact.type === 'VENDOR' ? 'VENDOR' : 'CUSTOMER') as UserRole;
+
     // Check if user already exists for this contact
     if (contact.user) {
       if (contact.user.password) {
         return NextResponse.json(
-          { error: 'This customer already has an account' },
+          { error: 'This contact already has an account set up' },
           { status: 400 }
         );
       }
@@ -62,7 +59,7 @@ export async function POST(request: NextRequest) {
       });
 
       const inviteLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/setup-account?token=${token}`;
-      const emailHtml = generateInviteEmail(contact.name, inviteLink);
+      const emailHtml = generateInviteEmail(contact.name, inviteLink, contact.type);
 
       await sendEmail({
         to: contact.email,
@@ -76,6 +73,41 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Check if a user with this email already exists (not linked to this contact)
+    const existingUserWithEmail = await prisma.user.findUnique({
+      where: { email: contact.email },
+    });
+
+    if (existingUserWithEmail) {
+      // Link this contact to existing user and resend invite
+      const token = generateToken();
+      const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+      await prisma.user.update({
+        where: { id: existingUserWithEmail.id },
+        data: {
+          contactId: contact.id,
+          inviteToken: token,
+          inviteExpires: expires,
+          role: role,
+        },
+      });
+
+      const inviteLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/setup-account?token=${token}`;
+      const emailHtml = generateInviteEmail(contact.name, inviteLink, contact.type);
+
+      await sendEmail({
+        to: contact.email,
+        subject: 'Welcome to Shiv Furniture - Set Up Your Account',
+        html: emailHtml,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Invitation sent successfully (linked to existing user)',
+      });
+    }
+
     // Create new user with invite token
     const token = generateToken();
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -84,7 +116,7 @@ export async function POST(request: NextRequest) {
       data: {
         email: contact.email,
         name: contact.name,
-        role: 'CUSTOMER',
+        role: role,
         contactId: contact.id,
         inviteToken: token,
         inviteExpires: expires,
@@ -94,13 +126,20 @@ export async function POST(request: NextRequest) {
 
     // Send invitation email
     const inviteLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/setup-account?token=${token}`;
-    const emailHtml = generateInviteEmail(contact.name, inviteLink);
+    const emailHtml = generateInviteEmail(contact.name, inviteLink, contact.type);
 
-    await sendEmail({
+    const emailSent = await sendEmail({
       to: contact.email,
       subject: 'Welcome to Shiv Furniture - Set Up Your Account',
       html: emailHtml,
     });
+
+    if (!emailSent) {
+      return NextResponse.json({
+        success: false,
+        message: 'User created but email failed to send. Check server logs.',
+      }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
@@ -109,7 +148,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error sending invitation:', error);
     return NextResponse.json(
-      { error: 'Failed to send invitation' },
+      { error: 'Failed to send invitation: ' + (error instanceof Error ? error.message : 'Unknown error') },
       { status: 500 }
     );
   }

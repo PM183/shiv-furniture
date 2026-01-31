@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 import { getNextSequence, parseDecimal } from '@/lib/utils';
-import { PaymentType } from '@prisma/client';
+
+type PaymentType = 'INCOMING' | 'OUTGOING';
+
+interface PaymentRecord {
+  amount: any;
+}
 
 async function updateInvoicePaymentStatus(invoiceId: string) {
   const invoice = await prisma.invoice.findUnique({
@@ -13,7 +18,7 @@ async function updateInvoicePaymentStatus(invoiceId: string) {
   if (!invoice) return;
 
   const totalPaid = invoice.payments.reduce(
-    (sum, p) => sum + parseDecimal(p.amount),
+    (sum: number, p: PaymentRecord) => sum + parseDecimal(p.amount),
     0
   );
   const totalAmount = parseDecimal(invoice.totalAmount);
@@ -42,7 +47,7 @@ async function updateVendorBillPaymentStatus(vendorBillId: string) {
   if (!bill) return;
 
   const totalPaid = bill.payments.reduce(
-    (sum, p) => sum + parseDecimal(p.amount),
+    (sum: number, p: PaymentRecord) => sum + parseDecimal(p.amount),
     0
   );
   const totalAmount = parseDecimal(bill.totalAmount);

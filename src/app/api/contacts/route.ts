@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 import { getNextSequence } from '@/lib/utils';
+import { sendEmail, generateInviteEmail, generateToken } from '@/lib/email';
+import { UserRole } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,12 +49,29 @@ export async function GET(request: NextRequest) {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              password: true,
+            },
+          },
+        },
       }),
       prisma.contact.count({ where }),
     ]);
 
+    // Transform contacts to include account status
+    const contactsWithStatus = contacts.map((contact: any) => ({
+      ...contact,
+      accountStatus: contact.user 
+        ? (contact.user.password ? 'ACTIVE' : 'PENDING') 
+        : 'NO_ACCOUNT',
+      user: undefined, // Remove user object from response
+    }));
+
     return NextResponse.json({
-      contacts,
+      contacts: contactsWithStatus,
       pagination: {
         page,
         limit,
@@ -94,6 +113,60 @@ export async function POST(request: NextRequest) {
         paymentTerms: body.paymentTerms || 30,
       },
     });
+
+    // Auto-send invite email if contact has email (for both vendors and customers)
+    if (body.email) {
+      try {
+        const token = generateToken();
+        const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        const role = (body.type === 'VENDOR' ? 'VENDOR' : 'CUSTOMER') as UserRole;
+
+        // Check if user with this email already exists
+        const existingUser = await prisma.user.findUnique({
+          where: { email: body.email },
+        });
+
+        if (existingUser) {
+          // Update existing user to link with this contact
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: {
+              contactId: contact.id,
+              inviteToken: token,
+              inviteExpires: expires,
+              role: role,
+            },
+          });
+        } else {
+          // Create new user
+          await prisma.user.create({
+            data: {
+              email: body.email,
+              name: body.name,
+              role: role,
+              contactId: contact.id,
+              inviteToken: token,
+              inviteExpires: expires,
+              password: null,
+            },
+          });
+        }
+
+        const inviteLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/setup-account?token=${token}`;
+        const emailHtml = generateInviteEmail(body.name, inviteLink, body.type);
+
+        await sendEmail({
+          to: body.email,
+          subject: 'Welcome to Shiv Furniture - Set Up Your Account',
+          html: emailHtml,
+        });
+
+        console.log(`✅ Invite email sent to ${body.type}: ${body.email}`);
+      } catch (emailError) {
+        console.error('Failed to send invite email:', emailError);
+        // Don't fail the contact creation if email fails
+      }
+    }
 
     return NextResponse.json({ contact }, { status: 201 });
   } catch (error) {

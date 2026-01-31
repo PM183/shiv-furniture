@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Eye, Mail, Send } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, Mail, RefreshCw, CheckCircle, Clock, UserX } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Pagination } from '@/components/ui/Pagination';
@@ -17,6 +17,7 @@ interface Contact {
   email: string | null;
   phone: string | null;
   city: string | null;
+  accountStatus: 'ACTIVE' | 'PENDING' | 'NO_ACCOUNT';
 }
 
 const contactTypes = [
@@ -43,6 +44,8 @@ export default function ContactsPage() {
     city: '',
     state: '',
     pincode: '',
+    creditLimit: '',
+    paymentTerms: '30',
   });
 
   const fetchContacts = async () => {
@@ -114,19 +117,15 @@ export default function ContactsPage() {
     }
   };
 
-  const handleSendInvite = async (contact: Contact) => {
+  const handleResendInvite = async (contact: Contact) => {
     if (!contact.email) {
       toast.error('Contact does not have an email address');
       return;
     }
-    
-    if (contact.type === 'VENDOR') {
-      toast.error('Cannot send portal invite to vendors');
-      return;
-    }
 
+    const contactType = contact.type === 'VENDOR' ? 'vendor' : 'customer';
     const confirmed = confirm(
-      `Send portal invitation to ${contact.name} (${contact.email})?\n\nThey will receive an email with a link to set up their account.`
+      `Resend portal invitation to ${contact.name} (${contact.email})?\n\nThey will receive a new email with a link to set up their ${contactType} account.`
     );
     
     if (!confirmed) return;
@@ -144,7 +143,8 @@ export default function ContactsPage() {
         throw new Error(data.error || 'Failed to send invitation');
       }
       
-      toast.success('Invitation sent successfully! Check console for the invite link (development mode).');
+      toast.success('Invitation resent successfully!');
+      fetchContacts();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -160,7 +160,8 @@ export default function ContactsPage() {
       city: '',
       state: '',
       pincode: '',
-      
+      creditLimit: '',
+      paymentTerms: '30',
     });
     setEditingContact(null);
   };
@@ -176,6 +177,8 @@ export default function ContactsPage() {
       city: contact.city || '',
       state: '',
       pincode: '',
+      creditLimit: '',
+      paymentTerms: '30',
     });
     setIsModalOpen(true);
   };
@@ -250,6 +253,8 @@ export default function ContactsPage() {
                   <th>Email</th>
                   <th>Phone</th>
                   <th>City</th>
+                  <th>Account Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -262,25 +267,45 @@ export default function ContactsPage() {
                     <td>{contact.phone || '-'}</td>
                     <td>{contact.city || '-'}</td>
                     <td>
+                      {contact.accountStatus === 'ACTIVE' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          <CheckCircle className="w-3 h-3" />
+                          Active
+                        </span>
+                      ) : contact.accountStatus === 'PENDING' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                          <Clock className="w-3 h-3" />
+                          Pending
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                          <UserX className="w-3 h-3" />
+                          No Account
+                        </span>
+                      )}
+                    </td>
+                    <td>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => openEditModal(contact)}
                           className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                          title="Edit Contact"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        {(contact.type === 'CUSTOMER' || contact.type === 'BOTH') && contact.email && (
+                        {contact.email && contact.accountStatus === 'PENDING' && (
                           <button
-                            onClick={() => handleSendInvite(contact)}
+                            onClick={() => handleResendInvite(contact)}
                             className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900 rounded text-blue-600"
-                            title="Send Portal Invite"
+                            title="Resend Invite"
                           >
-                            <Send className="w-4 h-4" />
+                            <RefreshCw className="w-4 h-4" />
                           </button>
                         )}
                         <button
                           onClick={() => handleDelete(contact.id)}
                           className="p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded text-red-600"
+                          title="Delete Contact"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

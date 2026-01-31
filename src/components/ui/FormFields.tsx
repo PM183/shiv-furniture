@@ -52,3 +52,20 @@ export function Textarea({ label, error, className, ...props }: TextareaProps) {
     </div>
   );
 }
+
+interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+  label?: string;
+}
+
+export function Checkbox({ label, className, ...props }: CheckboxProps) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="checkbox"
+        className={`h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 ${className || ''}`}
+        {...props}
+      />
+      {label && <label className="text-sm text-gray-700 dark:text-gray-300">{label}</label>}
+    </div>
+  );
+}

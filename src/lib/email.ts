@@ -3,15 +3,15 @@ import nodemailer from 'nodemailer';
 // For development, we'll use a mock/console logger
 // In production, configure with real SMTP settings
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+function createTransporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
 
 interface SendEmailOptions {
   to: string;
@@ -20,6 +20,10 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<boolean> {
+  console.log('📧 Attempting to send email to:', to);
+  console.log('SMTP_USER configured:', !!process.env.SMTP_USER);
+  console.log('SMTP_PASS configured:', !!process.env.SMTP_PASS);
+  
   // If SMTP is not configured, log to console
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.log('='.repeat(60));
@@ -35,20 +39,38 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
   }
 
   try {
-    await transporter.sendMail({
+    const transporter = createTransporter();
+    const info = await transporter.sendMail({
       from: process.env.SMTP_FROM || '"Shiv Furniture" <noreply@shivfurniture.com>',
       to,
       subject,
       html,
     });
+    console.log('✅ Email sent successfully! Message ID:', info.messageId);
     return true;
   } catch (error) {
-    console.error('Email sending failed:', error);
+    console.error('❌ Email sending failed:', error);
     return false;
   }
 }
 
-export function generateInviteEmail(name: string, inviteLink: string): string {
+export function generateInviteEmail(name: string, inviteLink: string, type: 'CUSTOMER' | 'VENDOR' | 'BOTH' = 'CUSTOMER'): string {
+  const isVendor = type === 'VENDOR';
+  const portalType = isVendor ? 'Vendor Portal' : 'Customer Portal';
+  const features = isVendor 
+    ? `
+              <li>View your purchase orders</li>
+              <li>Track bill payments</li>
+              <li>Download purchase order PDFs</li>
+              <li>Manage your account</li>
+            `
+    : `
+              <li>View your invoices and payment history</li>
+              <li>Track order status</li>
+              <li>Download invoice PDFs</li>
+              <li>Make online payments</li>
+            `;
+
   return `
     <!DOCTYPE html>
     <html>
@@ -71,14 +93,11 @@ export function generateInviteEmail(name: string, inviteLink: string): string {
             <h2 style="color: #1f2937; margin: 0 0 20px 0; font-size: 20px;">Welcome, ${name}! 👋</h2>
             
             <p style="color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
-              You have been invited to join the Shiv Furniture Customer Portal. This portal allows you to:
+              You have been invited to join the Shiv Furniture ${portalType}. This portal allows you to:
             </p>
             
             <ul style="color: #4b5563; line-height: 1.8; margin: 0 0 30px 0; padding-left: 20px;">
-              <li>View your invoices and payment history</li>
-              <li>Track order status</li>
-              <li>Download invoice PDFs</li>
-              <li>Make online payments</li>
+              ${features}
             </ul>
             
             <p style="color: #4b5563; line-height: 1.6; margin: 0 0 30px 0;">

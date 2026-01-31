@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     });
 
     const monthlyRevenue = Array(12).fill(0);
-    invoices.forEach((inv) => {
+    invoices.forEach((inv: any) => {
       const month = inv.invoiceDate.getMonth();
       monthlyRevenue[month] += parseDecimal(inv.totalAmount);
     });

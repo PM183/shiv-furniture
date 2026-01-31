@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
             description: true,
             quantity: true,
             unitPrice: true,
-            total: true,
+            lineTotal: true,
           },
         },
       },

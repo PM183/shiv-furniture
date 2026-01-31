@@ -2,7 +2,23 @@ import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import prisma from './prisma';
 import bcrypt from 'bcryptjs';
-import { User, UserRole } from '@prisma/client';
+
+// Type definitions
+type UserRole = 'ADMIN' | 'CUSTOMER';
+
+interface User {
+  id: string;
+  email: string;
+  password: string | null;
+  name: string;
+  role: UserRole;
+  isActive: boolean;
+  contactId: string | null;
+  inviteToken: string | null;
+  inviteExpires: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface AuthUser {
   id: string;

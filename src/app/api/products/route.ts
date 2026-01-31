@@ -19,7 +19,12 @@ export async function GET(request: NextRequest) {
     const where: any = { isActive: true };
     
     if (category) {
-      where.category = category;
+      // Check if it's a UUID (custom category) or enum value (default category)
+      if (category.includes('-')) {
+        where.categoryId = category;
+      } else {
+        where.category = category;
+      }
     }
     
     if (search) {
@@ -34,6 +39,7 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           analyticalAccount: true,
+          categoryRef: true,
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -67,12 +73,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const code = await getNextSequence('product');
 
+    // Determine if categoryId is a custom category UUID or default enum
+    const isCustomCategory = body.categoryId && body.categoryId.includes('-');
+    
     const product = await prisma.product.create({
       data: {
         code,
         name: body.name,
         description: body.description,
-        category: body.category,
+        category: isCustomCategory ? 'CUSTOM' : (body.categoryId || 'RAW_MATERIAL'),
+        categoryId: isCustomCategory ? body.categoryId : null,
         unit: body.unit || 'PCS',
         purchasePrice: body.purchasePrice,
         salePrice: body.salePrice,
@@ -82,6 +92,7 @@ export async function POST(request: NextRequest) {
       },
       include: {
         analyticalAccount: true,
+        categoryRef: true,
       },
     });
 

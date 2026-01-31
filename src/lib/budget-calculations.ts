@@ -87,7 +87,7 @@ export async function getBudgetVsActual(
   }
 
   // Build the result items
-  const items: BudgetVsActualItem[] = budgets.map((budget) => {
+  const items: BudgetVsActualItem[] = budgets.map((budget: any) => {
     const budgetAmount = budget.revisedAmount 
       ? parseDecimal(budget.revisedAmount) 
       : parseDecimal(budget.amount);
@@ -141,7 +141,7 @@ export async function getCostCenterPerformance(
   });
 
   const results = await Promise.all(
-    analyticalAccounts.map(async (account) => {
+    analyticalAccounts.map(async (account: any) => {
       // Get expenses from vendor bills
       const expenses = await prisma.vendorBillLine.aggregate({
         where: {

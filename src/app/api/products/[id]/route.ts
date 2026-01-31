@@ -44,12 +44,16 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
+    // Determine if categoryId is a custom category UUID or default enum
+    const isCustomCategory = body.categoryId && body.categoryId.includes('-');
+
     const product = await prisma.product.update({
       where: { id },
       data: {
         name: body.name,
         description: body.description,
-        category: body.category,
+        category: isCustomCategory ? 'CUSTOM' : (body.categoryId || undefined),
+        categoryId: isCustomCategory ? body.categoryId : null,
         unit: body.unit,
         purchasePrice: body.purchasePrice,
         salePrice: body.salePrice,
@@ -60,6 +64,7 @@ export async function PUT(
       },
       include: {
         analyticalAccount: true,
+        categoryRef: true,
       },
     });
 

@@ -1,4 +1,14 @@
-import { PrismaClient, UserRole, ContactType, ProductCategory, OrderStatus, BillStatus, InvoiceStatus, PaymentType, PaymentMethod } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+
+// Type definitions matching schema enums
+type UserRole = 'ADMIN' | 'CUSTOMER';
+type ContactType = 'CUSTOMER' | 'VENDOR' | 'BOTH';
+type ProductCategory = 'RAW_MATERIAL' | 'FINISHED_GOODS' | 'CONSUMABLES' | 'SERVICES';
+type OrderStatus = 'DRAFT' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
+type BillStatus = 'DRAFT' | 'POSTED' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED';
+type InvoiceStatus = 'DRAFT' | 'POSTED' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED';
+type PaymentType = 'INCOMING' | 'OUTGOING';
+type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'UPI' | 'CARD' | 'ONLINE';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();

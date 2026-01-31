@@ -1,5 +1,6 @@
 import prisma from './prisma';
-import { ProductCategory } from '@prisma/client';
+
+type ProductCategory = 'RAW_MATERIAL' | 'FINISHED_GOODS' | 'CONSUMABLES' | 'SERVICES';
 
 export interface AutoAnalyticalResult {
   analyticalAccountId: string | null;
