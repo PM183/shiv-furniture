@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { verifyAuth } from '@/lib/auth';
+import prisma from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
 
 // GET /api/portal/invoices - Get invoices for current customer
 export async function GET(request: NextRequest) {
   try {
-    const user = await verifyAuth(request);
+    const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

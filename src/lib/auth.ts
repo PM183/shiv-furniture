@@ -99,6 +99,9 @@ export async function authenticateUser(email: string, password: string): Promise
   
   if (!user || !user.isActive) return null;
   
+  // Check if user has a password set
+  if (!user.password) return null;
+  
   const isValid = await verifyPassword(password, user.password);
   if (!isValid) return null;
   

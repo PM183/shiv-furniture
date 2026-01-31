@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, Mail, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Pagination } from '@/components/ui/Pagination';
@@ -17,8 +17,6 @@ interface Contact {
   email: string | null;
   phone: string | null;
   city: string | null;
-  gstin: string | null;
-  isActive: boolean;
 }
 
 const contactTypes = [
@@ -45,10 +43,6 @@ export default function ContactsPage() {
     city: '',
     state: '',
     pincode: '',
-    gstin: '',
-    pan: '',
-    creditLimit: '',
-    paymentTerms: '30',
   });
 
   const fetchContacts = async () => {
@@ -120,6 +114,42 @@ export default function ContactsPage() {
     }
   };
 
+  const handleSendInvite = async (contact: Contact) => {
+    if (!contact.email) {
+      toast.error('Contact does not have an email address');
+      return;
+    }
+    
+    if (contact.type === 'VENDOR') {
+      toast.error('Cannot send portal invite to vendors');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Send portal invitation to ${contact.name} (${contact.email})?\n\nThey will receive an email with a link to set up their account.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch('/api/contacts/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId: contact.id }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send invitation');
+      }
+      
+      toast.success('Invitation sent successfully! Check console for the invite link (development mode).');
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -130,10 +160,7 @@ export default function ContactsPage() {
       city: '',
       state: '',
       pincode: '',
-      gstin: '',
-      pan: '',
-      creditLimit: '',
-      paymentTerms: '30',
+      
     });
     setEditingContact(null);
   };
@@ -149,10 +176,6 @@ export default function ContactsPage() {
       city: contact.city || '',
       state: '',
       pincode: '',
-      gstin: contact.gstin || '',
-      pan: '',
-      creditLimit: '',
-      paymentTerms: '30',
     });
     setIsModalOpen(true);
   };
@@ -227,8 +250,6 @@ export default function ContactsPage() {
                   <th>Email</th>
                   <th>Phone</th>
                   <th>City</th>
-                  <th>GSTIN</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,7 +261,6 @@ export default function ContactsPage() {
                     <td>{contact.email || '-'}</td>
                     <td>{contact.phone || '-'}</td>
                     <td>{contact.city || '-'}</td>
-                    <td className="text-xs">{contact.gstin || '-'}</td>
                     <td>
                       <div className="flex items-center gap-2">
                         <button
@@ -249,6 +269,15 @@ export default function ContactsPage() {
                         >
                           <Edit className="w-4 h-4" />
                         </button>
+                        {(contact.type === 'CUSTOMER' || contact.type === 'BOTH') && contact.email && (
+                          <button
+                            onClick={() => handleSendInvite(contact)}
+                            className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900 rounded text-blue-600"
+                            title="Send Portal Invite"
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDelete(contact.id)}
                           className="p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded text-red-600"
@@ -334,36 +363,7 @@ export default function ContactsPage() {
               onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
             />
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="GSTIN"
-              value={formData.gstin}
-              onChange={(e) => setFormData({ ...formData, gstin: e.target.value })}
-              placeholder="22AAAAA0000A1Z5"
-            />
-            <Input
-              label="PAN"
-              value={formData.pan}
-              onChange={(e) => setFormData({ ...formData, pan: e.target.value })}
-              placeholder="AAAAA0000A"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Credit Limit"
-              type="number"
-              value={formData.creditLimit}
-              onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
-            />
-            <Input
-              label="Payment Terms (Days)"
-              type="number"
-              value={formData.paymentTerms}
-              onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
-            />
-          </div>
+          
 
           <div className="flex justify-end gap-3 pt-4 border-t">
             <button

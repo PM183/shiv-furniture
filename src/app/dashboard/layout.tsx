@@ -25,6 +25,7 @@ import {
   Sun,
   Moon,
   ChevronDown,
+  UserCog,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
